@@ -8,16 +8,15 @@ usage() {
     echo "Usage: $0 [-r] [-h]"
     echo "  -r    Remove existing directories and Python environments before deployment."
     echo "  -h    Display this help and exit."
+    exit 1
 }
 
 # Parse flags
 while getopts "rh" flag; do
     case "${flag}" in
-        r) REMOVE_EXISTING="true" ;;
-        h) usage
-           exit ;;
-        *) usage
-           exit 1 ;;
+        r) REMOVE_EXISTING=true ;;
+        h) usage ;;
+        *) usage ;;
     esac
 done
 
@@ -54,15 +53,22 @@ if [ ! -s "$ZIP_FILE" ]; then
     exit 1
 fi
 
-# Current month and day for dynamic destination path
-DESTINATION_DIR=$(date +"/home/%Y/Releases/%d_%B") # Adjusted to a more suitable format
-
 # Loop through each host and perform the operations
 for HOST in "${HOSTS[@]}"; do
     REMOTE_USER=${HOST%@*}
     REMOTE_HOST=${HOST#*@}
 
+    # Define the destination directory using the user name
+    DESTINATION_DIR="/home/$REMOTE_USER/Releases/$(date +%d_%B_%Y)"
+
     echo "Preparing to deploy to $REMOTE_HOST..."
+    echo "Destination directory will be $DESTINATION_DIR"
+
+    # Ensure the directory exists on the remote host
+    if ! ssh "$REMOTE_USER@$REMOTE_HOST" "mkdir -p '$DESTINATION_DIR'"; then
+        echo "Failed to create directory on $REMOTE_HOST."
+        continue # Skip this host and continue with the next one
+    fi
 
     # SCP the file to the remote host
     if ! scp "$ZIP_FILE" "$REMOTE_USER@$REMOTE_HOST:$DESTINATION_DIR"; then
@@ -71,12 +77,13 @@ for HOST in "${HOSTS[@]}"; do
     fi
 
     # Execute commands on the remote host
-    if ! ssh "$REMOTE_USER@$REMOTE_HOST" bash -s <<EOF
+    ssh "$REMOTE_USER@$REMOTE_HOST" bash <<EOF
         if [ "$REMOVE_EXISTING" = "true" ]; then
             echo "Removing existing directory at $DESTINATION_DIR"
             rm -rf "$DESTINATION_DIR"
+            mkdir -p "$DESTINATION_DIR"
         fi
-        mkdir -p "$DESTINATION_DIR" && echo "Directory created at $DESTINATION_DIR"
+        echo "Directory ensured at $DESTINATION_DIR"
         cd "$DESTINATION_DIR" || exit
         echo "Unzipping file..."
         if ! unzip -o "$ZIP_FILE"; then
@@ -96,7 +103,7 @@ for HOST in "${HOSTS[@]}"; do
             exit 1
         fi
 EOF
-    then
+    if [ $? -ne 0 ]; then
         echo "An error occurred while setting up the environment on $REMOTE_HOST."
     else
         echo "Successfully set up the environment on $REMOTE_HOST."
