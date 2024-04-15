@@ -162,5 +162,6 @@ scripts/Scp/hosts.config
 scripts/Scp/release.zip
 
 
-ubuntu-20-04-amd64-python3.8.zip
-pybuda-v0.10.9.gs.240401-alpha-ubuntu-20-04-amd64-python3.8.zip
+Release/
+.DS_Store
+scripts/.DS_Store
