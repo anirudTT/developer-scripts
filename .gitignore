@@ -165,3 +165,5 @@ scripts/Scp/release.zip
 Release/
 .DS_Store
 scripts/.DS_Store
+hosts.config
+scripts/python_env_setup_dev/hosts.config
