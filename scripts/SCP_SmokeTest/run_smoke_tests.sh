@@ -1,19 +1,21 @@
 #!/bin/bash
 
 # Smoke test script to verify the setup of Python environments on remote hosts
+# Usage example: ./run_smoke_tests.sh [path_to_hosts_config_file] [path_to_smoke_test_py]
 
-# Usage example: ./run_smoke_tests.sh hosts.config /path/to/local/smoke_test.py
+# Default paths for configuration and Python script
+default_hosts_config="./hosts.config"
+default_smoke_test_py="./smoke_test.py"
 
-# Check if input arguments are provided
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <hosts_config> <path_to_smoke_test_py>"
-    exit 1
-fi
+# Use provided arguments or default to the relative paths
+HOSTS_CONFIG="${1:-$default_hosts_config}"
+SMOKE_TEST_PY="${2:-$default_smoke_test_py}"
 
-HOSTS_CONFIG="$1"
-SMOKE_TEST_PY="$2"
+# Check and echo the configuration paths being used
+echo "Using host configuration file: $HOSTS_CONFIG"
+echo "Using smoke test Python script: $SMOKE_TEST_PY"
 
-# Read remote host details from hosts.config
+# Read remote host details from configuration file
 echo "Reading host configurations from $HOSTS_CONFIG:"
 HOSTS=()
 while IFS='' read -r line || [[ -n "$line" ]]; do
@@ -21,6 +23,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
     HOSTS+=("$line")
 done < "$HOSTS_CONFIG"
 
+# Check if any hosts were read
 if [ ${#HOSTS[@]} -eq 0 ]; then
     echo "No hosts read from file. Please check the file content."
     exit 1
@@ -33,20 +36,15 @@ printf '%s\n' "${HOSTS[@]}"
 for HOST in "${HOSTS[@]}"; do
     REMOTE_USER=${HOST%@*}
     REMOTE_HOST=${HOST#*@}
-
-    # Assume the deployment date directory to get the path to the installed environment
     DESTINATION_DIR="/home/$REMOTE_USER/Releases/$(date +%d_%B_%Y)"
 
     echo "Running smoke tests on $REMOTE_HOST..."
     echo "Using directory $DESTINATION_DIR..."
-
-    # Copy the smoke test Python script to the remote host
     if ! scp "$SMOKE_TEST_PY" "$REMOTE_USER@$REMOTE_HOST:$DESTINATION_DIR/smoke_test.py"; then
         echo "Failed to copy smoke test script to $REMOTE_HOST."
         continue # Skip this host and continue with the next one
     fi
 
-    # Execute smoke test Python script on the remote host
     ssh "$REMOTE_USER@$REMOTE_HOST" bash <<EOF
         echo "Accessing directory at $DESTINATION_DIR"
         cd "$DESTINATION_DIR" || exit 1
@@ -61,4 +59,4 @@ EOF
     fi
 done
 
-echo "Smoke test execution completed!"
+echo "Smoke test execution completed! Was successful :)"
